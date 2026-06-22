@@ -185,6 +185,58 @@
   }
   .leg-qualified { background: var(--qualified-bg); border: 1px solid var(--accent-green); }
   .leg-projected { background: rgba(22,163,74,0.06); border: 1px solid rgba(22,163,74,0.3); }
+  .legend-abbr {
+    padding: 0 32px 24px;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    line-height: 1.8;
+  }
+
+  /* UPCOMING MATCHES */
+  .upcoming-section { padding: 0 32px 32px; }
+  .upcoming-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 4px;
+  }
+  .upcoming-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 18px;
+    flex: 1 1 220px;
+    max-width: 320px;
+  }
+  .upcoming-date {
+    font-size: 0.67rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+  .upcoming-group-badge {
+    display: inline-block;
+    background: rgba(245,158,11,0.12);
+    color: var(--accent-gold);
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+  }
+  .upcoming-matchup {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+  }
+  .upcoming-vs { color: var(--text-muted); font-weight: 400; margin: 0 4px; }
+  .upcoming-prediction {
+    font-size: 0.75rem;
+    color: var(--accent-gold);
+  }
 
   /* BRACKET */
   .bracket-container {
@@ -337,6 +389,22 @@
   <div class="legend-item"><div class="legend-box leg-qualified"></div> Confirmed qualified</div>
   <div class="legend-item"><div class="legend-box leg-projected"></div> Projected to advance</div>
 </div>
+<div class="legend-abbr">
+  P&nbsp;=&nbsp;Played &nbsp;·&nbsp; W&nbsp;=&nbsp;Wins &nbsp;·&nbsp; D&nbsp;=&nbsp;Draws &nbsp;·&nbsp; L&nbsp;=&nbsp;Losses &nbsp;·&nbsp;
+  GF&nbsp;=&nbsp;Goals&nbsp;For &nbsp;·&nbsp; GA&nbsp;=&nbsp;Goals&nbsp;Against &nbsp;·&nbsp;
+  GD&nbsp;=&nbsp;Goal&nbsp;Difference &nbsp;·&nbsp; Pts&nbsp;=&nbsp;Points
+</div>
+
+<section id="upcoming-section" style="display:none">
+  <div class="section-header">
+    <h2>Upcoming Matches</h2>
+    <div class="section-divider"></div>
+    <span class="section-note">Next group-stage fixtures with predicted winners</span>
+  </div>
+  <div class="upcoming-section">
+    <div class="upcoming-grid" id="upcoming-grid"></div>
+  </div>
+</section>
 
 <div class="section-header">
   <h2>Predicted Bracket</h2>
@@ -455,6 +523,36 @@ const KNOWN_MATCHES = [
   // Group L - Round 1 results
   ['L','England',3,0,'Panama', true],
   ['L','Croatia',2,1,'Ghana', true],
+  // Group G - upcoming (Round 2 & 3)
+  ['G','Belgium',0,0,'Iran', false, '2026-06-22'],
+  ['G','Egypt',0,0,'New Zealand', false, '2026-06-22'],
+  ['G','Belgium',0,0,'New Zealand', false, '2026-06-26'],
+  ['G','Iran',0,0,'Egypt', false, '2026-06-26'],
+  // Group H - upcoming (Round 2 & 3)
+  ['H','Spain',0,0,'Uruguay', false, '2026-06-23'],
+  ['H','Cabo Verde',0,0,'Saudi Arabia', false, '2026-06-23'],
+  ['H','Spain',0,0,'Saudi Arabia', false, '2026-06-27'],
+  ['H','Uruguay',0,0,'Cabo Verde', false, '2026-06-27'],
+  // Group I - upcoming (Round 2 & 3)
+  ['I','France',0,0,'Senegal', false, '2026-06-22'],
+  ['I','Norway',0,0,'Iraq', false, '2026-06-22'],
+  ['I','France',0,0,'Norway', false, '2026-06-26'],
+  ['I','Senegal',0,0,'Iraq', false, '2026-06-26'],
+  // Group J - upcoming (Round 2 & 3)
+  ['J','Argentina',0,0,'Austria', false, '2026-06-23'],
+  ['J','Algeria',0,0,'Jordan', false, '2026-06-23'],
+  ['J','Argentina',0,0,'Jordan', false, '2026-06-27'],
+  ['J','Austria',0,0,'Algeria', false, '2026-06-27'],
+  // Group K - upcoming (Round 2 & 3)
+  ['K','Portugal',0,0,'Colombia', false, '2026-06-24'],
+  ['K','Uzbekistan',0,0,'DR Congo', false, '2026-06-24'],
+  ['K','Portugal',0,0,'DR Congo', false, '2026-06-28'],
+  ['K','Colombia',0,0,'Uzbekistan', false, '2026-06-28'],
+  // Group L - upcoming (Round 2 & 3)
+  ['L','England',0,0,'Croatia', false, '2026-06-25'],
+  ['L','Ghana',0,0,'Panama', false, '2026-06-25'],
+  ['L','England',0,0,'Ghana', false, '2026-06-29'],
+  ['L','Croatia',0,0,'Panama', false, '2026-06-29'],
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -832,8 +930,6 @@ function mergeESPNData(data) {
   (data.events || []).forEach(event => {
     const comp = event.competitions?.[0];
     if (!comp) return;
-    // Only completed group-stage matches
-    if (!comp.status?.type?.completed) return;
     const competitors = comp.competitors || [];
     if (competitors.length < 2) return;
 
@@ -841,14 +937,32 @@ function mergeESPNData(data) {
     const away = competitors.find(c => c.homeAway === 'away') || competitors[1];
     const t1 = normTeamName(home.team?.displayName || home.team?.name || '');
     const t2 = normTeamName(away.team?.displayName || away.team?.name || '');
-    const s1 = parseInt(home.score) || 0;
-    const s2 = parseInt(away.score) || 0;
-
-    // Determine group from team-to-group map
     const grp = TEAM_TO_GROUP[t1] || TEAM_TO_GROUP[t2];
-    if (!grp) return; // Skip non-group-stage or unknown teams
+    if (!grp) return;
 
-    if (addMatchIfNew(grp, t1, s1, s2, t2)) added++;
+    if (comp.status?.type?.completed) {
+      const s1 = parseInt(home.score) || 0;
+      const s2 = parseInt(away.score) || 0;
+      if (addMatchIfNew(grp, t1, s1, s2, t2)) added++;
+      // Mark existing upcoming entry as played if present
+      const existing = KNOWN_MATCHES.find(m =>
+        m[0] === grp && !m[5] &&
+        ((normTeamName(m[1]) === t1 && normTeamName(m[4]) === t2) ||
+         (normTeamName(m[1]) === t2 && normTeamName(m[4]) === t1))
+      );
+      if (existing) { existing[1] = t1; existing[2] = s1; existing[3] = s2; existing[4] = t2; existing[5] = true; }
+    } else {
+      // Upcoming game — update date on matching unplayed entry
+      const dateStr = event.date ? event.date.substring(0, 10) : null;
+      if (dateStr) {
+        const entry = KNOWN_MATCHES.find(m =>
+          m[0] === grp && !m[5] &&
+          ((normTeamName(m[1]) === t1 && normTeamName(m[4]) === t2) ||
+           (normTeamName(m[1]) === t2 && normTeamName(m[4]) === t1))
+        );
+        if (entry) entry[6] = dateStr;
+      }
+    }
   });
   return added;
 }
@@ -883,9 +997,11 @@ function setDataBadge(text, live) {
 async function tryFetchLiveData() {
   // Build list of dates from WC start through today
   const wcStart = new Date('2026-06-11');
+  const wcEnd = new Date('2026-07-19'); // through final
   const today = new Date();
+  const rangeEnd = wcEnd < today ? today : wcEnd;
   const dates = [];
-  for (let d = new Date(wcStart); d <= today; d.setDate(d.getDate() + 1)) {
+  for (let d = new Date(wcStart); d <= rangeEnd; d.setDate(d.getDate() + 1)) {
     dates.push(
       d.getFullYear().toString() +
       String(d.getMonth()+1).padStart(2,'0') +
@@ -924,11 +1040,47 @@ async function tryFetchLiveData() {
 // INIT
 // ─────────────────────────────────────────────────────────────────────────────
 
+function renderUpcoming(allStandings) {
+  const upcoming = KNOWN_MATCHES.filter(m => !m[5]);
+  const section = document.getElementById('upcoming-section');
+  const grid = document.getElementById('upcoming-grid');
+
+  if (!upcoming.length) { section.style.display = 'none'; return; }
+  section.style.display = '';
+
+  upcoming.sort((a, b) => {
+    if (!a[6] && !b[6]) return 0;
+    if (!a[6]) return 1;
+    if (!b[6]) return -1;
+    return a[6].localeCompare(b[6]);
+  });
+
+  grid.innerHTML = upcoming.map(m => {
+    const [grp, t1, , , t2, , date] = m;
+    const f1 = FLAGS[t1] || '';
+    const f2 = FLAGS[t2] || '';
+    const pred = predictMatch(t1, t2, allStandings);
+    const conf = Math.round(pred.conf * 100);
+    const label = confLabel(pred.conf);
+    const fw = FLAGS[pred.winner] || '';
+    const dateDisplay = date
+      ? new Date(date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      : 'TBD';
+    return `<div class="upcoming-card">
+      <div class="upcoming-date">${dateDisplay}</div>
+      <div class="upcoming-group-badge">Group ${grp}</div>
+      <div class="upcoming-matchup">${f1} ${t1} <span class="upcoming-vs">vs</span> ${f2} ${t2}</div>
+      <div class="upcoming-prediction">Predicted: ${fw} ${pred.winner} &mdash; ${label} ${conf}%</div>
+    </div>`;
+  }).join('');
+}
+
 function renderAll() {
   const allStandings = buildAllStandings();
   const bracket = buildBracket(allStandings);
   renderGroups(allStandings);
   renderBracket(bracket);
+  renderUpcoming(allStandings);
 }
 
 async function init() {
