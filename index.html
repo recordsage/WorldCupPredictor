@@ -1055,11 +1055,12 @@ function renderUpcoming(allStandings) {
     return a[6].localeCompare(b[6]);
   });
 
+  const flatStandings = Object.values(allStandings).flat();
   grid.innerHTML = upcoming.map(m => {
     const [grp, t1, , , t2, , date] = m;
     const f1 = FLAGS[t1] || '';
     const f2 = FLAGS[t2] || '';
-    const pred = predictMatch(t1, t2, allStandings);
+    const pred = predictMatch(t1, t2, flatStandings);
     const conf = Math.round(pred.conf * 100);
     const label = confLabel(pred.conf);
     const fw = FLAGS[pred.winner] || '';
